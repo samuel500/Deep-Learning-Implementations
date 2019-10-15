@@ -85,10 +85,10 @@ def style_transfer(content_image, style_image, content_layers, content_weight,
             # Compute loss
             c_loss = content_loss(content_weight, content_feats, content_targets)
             s_loss = style_loss(feats, style_layers, style_targets, style_weights)
-            t_loss = tv_loss(img_var, tv_weight)
+            t_loss = total_variation_loss(img_var, total_variation_weight)
             #print('content_loss', c_loss)
             #print('style_loss', s_loss)
-            #print('tv_loss', t_loss)
+            #print('total_variation_loss', t_loss)
 
             loss =  s_loss + t_loss + c_loss
             print(t, ' Loss:', loss)
@@ -145,8 +145,8 @@ def style_loss(feats, style_layers, style_targets, style_weights):
 
 
 @tf.function
-def total_variation_loss(img, tv_weight):
-    return tv_weight * tf.image.total_variation(img)
+def total_variation_loss(img, total_variation_weight):
+    return total_variation_weight * tf.image.total_variation(img)
 
 
 
@@ -170,7 +170,9 @@ if __name__=='__main__':
         #'content_image' : 'styles/greg.jpg',
         'content_image' : 'styles/blackpool.jpg',
 
-        'style_image' : 'styles/composition_vii.jpg',
+        #'style_image' : 'styles/composition_vii.jpg',
+        'style_image' : 'styles/muse.jpg',
+
         #'style_image': 'styles/starry_night.jpg',
         #'style_image': 'styles/impr_sunset.jpg',
         #'style_image': 'styles/the_scream.jpg',
