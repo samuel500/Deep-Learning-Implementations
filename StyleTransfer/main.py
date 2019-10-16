@@ -15,11 +15,15 @@ import matplotlib.pyplot as plt
 from image_utils import load_image, preprocess_image, deprocess_image
 
 from squeezenet import SqueezeNet
+from PIL import Image
+import imageio
 
 
 
 def style_transfer(content_image, style_image, content_layers, content_weight,
-                   style_layers, style_weights, total_variation_weight, model, init_random = False):
+                   style_layers, style_weights, total_variation_weight, model, 
+                   init_random=False, create_gif=False, save_images=True, show_interval=50,
+                   max_iter=200, image_size=512):
     """
     Inputs:
     :content_image: filename of content image
@@ -31,12 +35,15 @@ def style_transfer(content_image, style_image, content_layers, content_weight,
     :total_variation_weight: weight of total variation regularization loss term
     :init_random: initialize the starting image to uniform random noise
     """
-    content_img = preprocess_image(load_image(content_image))
+
+    style_t_name = content_image.split('/')[-1].split('.')[0] + '_' + style_image.split('/')[-1].split('.')[0]  
+
+    content_img = preprocess_image(load_image(content_image, image_size))
     feats = model.get_layers(content_img[None])
     content_targets = [feats[i] for i in content_layers]
 
     # Extract features from the style image
-    style_img = preprocess_image(load_image(style_image))
+    style_img = preprocess_image(load_image(style_image, image_size))
     feats = model.get_layers(style_img[None])
     style_feat_vars = [feats[i] for i in style_layers]
 
@@ -55,8 +62,7 @@ def style_transfer(content_image, style_image, content_layers, content_weight,
         img_var = tf.Variable(content_img[None])
 
     
-    lr = 0.2
-    max_iter = 200
+    lr = 0.1
 
     lr_var = tf.Variable(lr)
     optimizer = tf.keras.optimizers.Adam(learning_rate=lr_var)
@@ -71,8 +77,10 @@ def style_transfer(content_image, style_image, content_layers, content_weight,
     axarr[1].imshow(deprocess_image(style_img))
     plt.show()
     plt.figure()
-    
 
+    if create_gif:
+        gif_file = style_t_name + str(np.random.randint(10000))  + '.gif'
+        writer = imageio.get_writer(gif_file, mode='I', duration=0.18)
 
     for t in range(max_iter):
 
@@ -86,9 +94,9 @@ def style_transfer(content_image, style_image, content_layers, content_weight,
             c_loss = content_loss(content_weight, content_feats, content_targets)
             s_loss = style_loss(feats, style_layers, style_targets, style_weights)
             t_loss = total_variation_loss(img_var, total_variation_weight)
-            #print('content_loss', c_loss)
-            #print('style_loss', s_loss)
-            #print('total_variation_loss', t_loss)
+            print('content_loss', c_loss)
+            print('style_loss', s_loss)
+            print('total_variation_loss', t_loss)
 
             loss =  s_loss + t_loss + c_loss
             print(t, ' Loss:', loss)
@@ -100,18 +108,31 @@ def style_transfer(content_image, style_image, content_layers, content_weight,
 
         img_var.assign(tf.clip_by_value(img_var, -1.5, 1.5))
 
-        if t % 50 == 0:
+        if not t % show_interval:
             print('Iteration {}'.format(t))
-            image = img_var
-            plt.imshow(deprocess_image(image[0], rescale=True))
+            image = deprocess_image(img_var[0], rescale=True)
+            plt.imshow(image)
             plt.axis('off')
             plt.show()
 
-    print('Iteration {}'.format(t))
-    image = img_var       
-    plt.imshow(deprocess_image(image[0], rescale=True))
+            if save_images:
+                im = Image.fromarray(image)
+                im.save(style_t_name + "_styled{}_t:{}.jpg".format(np.random.randint(10000), t))
+
+        if not t % 16: 
+            image = deprocess_image(img_var[0], rescale=True)
+            #image = Image.fromarray(image)
+            writer.append_data(image)
+    if create_gif:
+        writer.close()
+
+    image = deprocess_image(img_var[0], rescale=True)
+    plt.imshow(image)
     plt.axis('off')
     plt.show()
+ 
+    im = Image.fromarray(image)
+    im.save(style_t_name + "_styled{}_t:{}.jpg".format(np.random.randint(10000), t))
 
 
 @tf.function
@@ -164,33 +185,45 @@ if __name__=='__main__':
     m.set_weights(all_weights)
     m.trainable = False
 
-    sw = 0.01
+    sw = 0.012
 
     params1 = {
-        #'content_image' : 'styles/greg.jpg',
+        #'content_image' : 'private/greg.jpg',
+        #'content_image' : 'private/kris.jpg',
+        #'content_image' : 'private/whats.jpeg',
+        
         'content_image' : 'styles/blackpool.jpg',
 
+
         #'style_image' : 'styles/composition_vii.jpg',
-        'style_image' : 'styles/muse.jpg',
+        #'style_image' : 'styles/muse.jpg',
 
         #'style_image': 'styles/starry_night.jpg',
         #'style_image': 'styles/impr_sunset.jpg',
         #'style_image': 'styles/the_scream.jpg',
         #'style_image': 'styles/mona.jpg',
 
-        #'style_image': 'styles/farm-painting.jpg',        
+        'style_image': 'styles/farm-painting.jpg',        
 
         #'style_image': 'styles/impr2.jpg',        
-    
+        #'style_image': 'styles/dali.jpg',
+        #'style_image': 'styles/cubism.jpg',                
+
         #'style_image': 'styles/liberty.jpeg',
 
         'content_layers' : [2],
-        'content_weight' : 1800, 
+        'content_weight' : 2500, 
         'style_layers' : (2, 3, 5, 6, 9), #, 10),
-        'style_weights' : (sw*10000, sw*2000, sw*400, sw*80, sw), #(20, 0,0,0,32), #
-        'total_variation_weight' : 0.004,
-        'init_random': False,
-        'model': m
+        'style_weights' : (sw*20000, sw*2000, sw*400, sw*80, sw), #(20, 0,0,0,32), #
+        'total_variation_weight' : 0.005,
+        'init_random': True,
+        'model': m,
+
+        'create_gif' : True,
+        'save_images' : False, 
+        'show_interval' : 100,
+        'max_iter': 400,
+        'image_size': 448
     }
 
     style_transfer(**params1)

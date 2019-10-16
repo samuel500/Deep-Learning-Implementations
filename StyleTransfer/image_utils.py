@@ -26,7 +26,6 @@ def deprocess_image(img, rescale=False):
 
 def load_image(filename, size=512):
     """Load and resize an image from disk.
-
     Inputs:
     :filename: path to file
     :size: size of shortest dimension after rescaling

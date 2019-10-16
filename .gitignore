@@ -1,0 +1,6 @@
+DeepDream/
+
+
+__pycache__/
+*.pyc
+*.pyo
