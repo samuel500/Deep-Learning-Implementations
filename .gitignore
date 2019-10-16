@@ -2,5 +2,5 @@ DeepDream/
 
 
 __pycache__/
-.pyc
-.pyo
+*.pyc
+*.pyo
