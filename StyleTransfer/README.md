@@ -13,7 +13,10 @@
 
 -Matplotlib 3.0.2
 
+-imageio 2.5.0 (for GIF generation)
+
 -Python 3
+
 
 
 # Reading
