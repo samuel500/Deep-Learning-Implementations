@@ -1,6 +1,6 @@
 # Style Transfer
 
-![alt text](https://raw.githubusercontent.com/samuel500/Deep-Learning-Implementations/master/StyleTransfer/Figure_6.png)
+![alt text](https://github.com/samuel500/Deep-Learning-Implementations/raw/master/StyleTransfer/blackpool_farm-painting4232.gif)
 
 
 # Notes
