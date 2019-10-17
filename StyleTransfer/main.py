@@ -1,9 +1,13 @@
 """
-Based on:
+Implementation of:
 https://arxiv.org/pdf/1508.06576.pdf
 """
 
+import sys
+sys.path.append("..") # to import things one level up
+
 import tensorflow as tf 
+
 
 import numpy as np 
 
@@ -181,7 +185,7 @@ if __name__=='__main__':
 
     all_n = []
     
-    all_n = get_ckpt_weights('./model_weights/squeezenet.ckpt')
+    all_n = get_ckpt_weights('../squeezenet_weights/squeezenet.ckpt')
     
     all_weights = []
     for w in m.model.weights:
