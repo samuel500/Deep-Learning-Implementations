@@ -34,6 +34,11 @@ def style_transfer(content_image, style_image, content_layers, content_weight,
     :style_weights: list of weights to use for each layer in style_layers
     :total_variation_weight: weight of total variation regularization loss term
     :init_random: initialize the starting image to uniform random noise
+    :create_gif: create a gif of the training progress
+    :save_images: save styled image at interval
+    :show_interval: display styled image at iteration interval
+    :max_iter: stop training after max_iter training iterations
+    :image_size: size to rescale smallest image dimension to
     """
 
     style_t_name = content_image.split('/')[-1].split('.')[0] + '_' + style_image.split('/')[-1].split('.')[0]  
