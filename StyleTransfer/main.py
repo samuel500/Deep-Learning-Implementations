@@ -13,14 +13,15 @@ import numpy as np
 
 from pprint import pprint
 from copy import deepcopy
-from utils import weight_to_weight, get_ckpt_weights
 import matplotlib.pyplot as plt
 
-from image_utils import load_image, preprocess_image, deprocess_image
-
-from squeezenet import SqueezeNet
 from PIL import Image
 import imageio
+
+from image_utils import load_image
+from squeezenet import SqueezeNet
+from utils import weight_to_weight, get_ckpt_weights
+
 
 
 
@@ -47,12 +48,12 @@ def style_transfer(content_image, style_image, content_layers, content_weight,
 
     style_t_name = content_image.split('/')[-1].split('.')[0] + '_' + style_image.split('/')[-1].split('.')[0]  
 
-    content_img = preprocess_image(load_image(content_image, image_size))
+    content_img = model.preprocess_image(load_image(content_image, image_size))
     feats = model.get_layers(content_img[None])
     content_targets = [feats[i] for i in content_layers]
 
     # Extract features from the style image
-    style_img = preprocess_image(load_image(style_image, image_size))
+    style_img = model.preprocess_image(load_image(style_image, image_size))
     feats = model.get_layers(style_img[None])
     style_feat_vars = [feats[i] for i in style_layers]
 
@@ -82,8 +83,8 @@ def style_transfer(content_image, style_image, content_layers, content_weight,
     axarr[1].axis('off')
     axarr[0].set_title('Content Source Img.')
     axarr[1].set_title('Style Source Img.')
-    axarr[0].imshow(deprocess_image(content_img))
-    axarr[1].imshow(deprocess_image(style_img))
+    axarr[0].imshow(model.deprocess_image(content_img))
+    axarr[1].imshow(model.deprocess_image(style_img))
     plt.show()
     plt.figure()
 
@@ -119,7 +120,7 @@ def style_transfer(content_image, style_image, content_layers, content_weight,
 
         if not t % show_interval:
             print('Iteration {}'.format(t))
-            image = deprocess_image(img_var[0], rescale=True)
+            image = model.deprocess_image(img_var[0], rescale=True)
             plt.imshow(image)
             plt.axis('off')
             plt.show()
@@ -129,13 +130,13 @@ def style_transfer(content_image, style_image, content_layers, content_weight,
                 im.save(style_t_name + "_styled{}_t:{}.jpg".format(np.random.randint(10000), t))
 
         if not t % 16: 
-            image = deprocess_image(img_var[0], rescale=True)
+            image = model.deprocess_image(img_var[0], rescale=True)
             #image = Image.fromarray(image)
             writer.append_data(image)
     if create_gif:
         writer.close()
 
-    image = deprocess_image(img_var[0], rescale=True)
+    image = model.deprocess_image(img_var[0], rescale=True)
     plt.imshow(image)
     plt.axis('off')
     plt.show()
@@ -228,7 +229,7 @@ if __name__=='__main__':
         'init_random': True,
         'model': m,
 
-        'create_gif' : True,
+        'create_gif' : False,
         'save_images' : False, 
         'show_interval' : 100,
         'max_iter': 400,
