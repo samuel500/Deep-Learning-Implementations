@@ -28,7 +28,7 @@ from utils import weight_to_weight, get_ckpt_weights
 def style_transfer(content_image, style_image, content_layers, content_weight,
                    style_layers, style_weights, total_variation_weight, model, 
                    init_random=False, create_gif=False, save_images=True, show_interval=50,
-                   max_iter=200, image_size=512):
+                   max_iter=200, image_size=512, lr=0.1):
     """
     Inputs:
     :content_image: filename of content image
@@ -72,12 +72,11 @@ def style_transfer(content_image, style_image, content_layers, content_weight,
         img_var = tf.Variable(content_img[None])
 
     
-    lr = 0.1
 
     lr_var = tf.Variable(lr)
     optimizer = tf.keras.optimizers.Adam(learning_rate=lr_var)
 
-    img_var.assign(tf.clip_by_value(img_var, -1.5, 1.5))
+    img_var.assign(model.clip_image(img_var))
     f, axarr = plt.subplots(1,2)
     axarr[0].axis('off')
     axarr[1].axis('off')
@@ -116,7 +115,7 @@ def style_transfer(content_image, style_image, content_layers, content_weight,
         optimizer.apply_gradients(zip(gradients, [img_var]))
 
 
-        img_var.assign(tf.clip_by_value(img_var, -1.5, 1.5))
+        img_var.assign(model.clip_image(img_var))
 
         if not t % show_interval:
             print('Iteration {}'.format(t))
@@ -233,7 +232,8 @@ if __name__=='__main__':
         'save_images' : False, 
         'show_interval' : 100,
         'max_iter': 400,
-        'image_size': 448
+        'image_size': 448,
+        'lr': 0.1
     }
 
     style_transfer(**params1)
