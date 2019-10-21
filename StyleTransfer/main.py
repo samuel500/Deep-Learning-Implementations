@@ -82,8 +82,8 @@ def style_transfer(content_image, style_image, content_layers, content_weight,
     axarr[1].axis('off')
     axarr[0].set_title('Content Source Img.')
     axarr[1].set_title('Style Source Img.')
-    axarr[0].imshow(model.deprocess_image(content_img))
-    axarr[1].imshow(model.deprocess_image(style_img))
+    axarr[0].imshow(model.deprocess_image(content_img, rescale=False))
+    axarr[1].imshow(model.deprocess_image(style_img, rescale=False))
     plt.show()
     plt.figure()
 

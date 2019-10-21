@@ -91,7 +91,7 @@ class SqueezeNet(tf.keras.Model):
         return (img.astype(np.float32)/255.0 - SQUEEZENET_MEAN) / SQUEEZENET_STD
 
 
-    def deprocess_image(self, img, rescale=False):
+    def deprocess_image(self, img, rescale=True):
         """Undo preprocessing on an image and convert back to uint8."""
         img = (img * SQUEEZENET_STD + SQUEEZENET_MEAN)
         img = np.array(img)

@@ -10,39 +10,20 @@ import imageio
 
 from matplotlib import pyplot as plt
 
-from tensorflow.keras.preprocessing import image
-
-
-from image_utils import load_image
-from squeezenet import SqueezeNet
-from utils import weight_to_weight, get_ckpt_weights
-
-
 import imageio
 
-
+from tqdm import tqdm
 import cv2
-
-
-
 
 import scipy.ndimage as nd
 
+from image_utils import load_image
+
+from models_utils import *
 
 
-# Normalize an image
-def deprocess(img):
-    img = 255*(img + 1.0)/2.0
-    return tf.cast(img, tf.uint8)
 
 
-# Display an image
-def show(img):
-    plt.figure(figsize=(12,12))
-    plt.grid(False)
-    plt.axis('off')
-    plt.imshow(img)
-    plt.show()
 
 
 
@@ -52,15 +33,16 @@ def calc_loss(img, model, target=None, channels=None):
     #print('ims', img.shape)
 
     img_batch = tf.expand_dims(img, axis=0)
-    #img_batch = img
     layer_activations = model(img_batch) #.numpy()
 
     #print(layer_activations[0].shape)
     
-    #print(layer_activations)
     #print('Predicted:', iv3.decode_predictions(layer_activations, top=5)[0])
 
     if target is not None:
+        
+        raise NotImplementedError
+
         layer_activations = layer_activations[0]
         print('las', layer_activations.shape)
         print('ts', target.shape)
@@ -72,18 +54,18 @@ def calc_loss(img, model, target=None, channels=None):
         A = tf.matmul(x, y, transpose_a=True)
         print('As', A.shape)
         #raise
-        idx1 = np.array(range(x.shape[0]))
-        idx2 = tf.argmax(A, axis=0).numpy() #[:x.shape[1]]
-        Aa = np.array(A)
+        idx1 = np.array(range(A.shape[0]))
+        idx2 = tf.argmax(A, axis=1).numpy() #[:x.shape[1]]
+        #Aa = np.array(A)
 
-        print('amax Aa', np.amax(Aa))
-        print('mean Aa', np.mean(Aa))
+        #print('amax Aa', np.amax(Aa))
+        #print('mean Aa', np.mean(Aa))
 
         print(idx1.shape)
         print(idx2.shape)
 
         s = list(zip(list(idx1), list(idx2)))
-        result = tf.gather_nd(x, s)
+        result = tf.gather_nd(A, s)
         print(result.shape)
 
         #diff = y[:,list(tf.argmax(A, axis=1).numpy())]
@@ -92,7 +74,7 @@ def calc_loss(img, model, target=None, channels=None):
 
 
     elif channels is not None:
-   
+
         if not hasattr(channels, '__iter__'):
             channels = [channels]
 
@@ -101,7 +83,9 @@ def calc_loss(img, model, target=None, channels=None):
         if max(channels) >= C:
             raise IndexError("Invalid channel index:{} (max:{})".format(max(channels),C-1))
 
-        t = tf.gather(layer_activations[0], axis=3, batch_dims=0, indices=list(channels))
+        if len(layer_activations) == 5:
+            layer_activations = layer_activations[0]
+        t = tf.gather(layer_activations, axis=3, batch_dims=0, indices=list(channels))
 
         return tf.math.reduce_mean(t)
 
@@ -112,22 +96,14 @@ def calc_loss(img, model, target=None, channels=None):
                 loss = tf.math.reduce_mean(act)
                 losses.append(loss)
         else:
-            #t = np.zeros(1000)
-            #t = layer_activations
-            #t[0][594] = 1
-
             loss = tf.math.reduce_mean(layer_activations)
-            #loss = tf.math.reduce_mean(layer_activations)
             losses.append(loss)
 
         return tf.reduce_sum(losses)
 
 
-def zoom_in():
-    pass
-
 #@tf.function
-def get_tiled_gradients(model, img, tile_size=512, target=None, channels=None):
+def get_tiled_gradients(model, img, tile_size=1024, target=None, channels=None):
     shift_down, shift_right, img_rolled = random_roll(img, tile_size)
 
     # Initialize the image gradients to zero.
@@ -158,7 +134,7 @@ def get_tiled_gradients(model, img, tile_size=512, target=None, channels=None):
             # Update the image gradients for this tile.
             gradients += tape.gradient(loss, img_rolled)
 
-    print('tot_loss:', tot_loss)
+    #print('tot_loss:', tot_loss)
     # Undo the random shift applied to the image and its gradients.
     gradients = tf.roll(tf.roll(gradients, -shift_right, axis=1), -shift_down, axis=0)
 
@@ -172,7 +148,7 @@ def get_tiled_gradients(model, img, tile_size=512, target=None, channels=None):
 
 def deep_dream(model, img, steps_per_octave=100, step_size=0.01,
                                 num_octaves=4, octave_scale=1.4, target=None, channels=None, zoom=1, 
-                                create_gif=False, create_video=False):
+                                create_gif=False, create_video=False, rand_channel=None):
     #img = tf.keras.preprocessing.image.img_to_array(img)
     #img = iv3.preprocess_input(img)
     img = model.preprocess_image(img)
@@ -184,9 +160,9 @@ def deep_dream(model, img, steps_per_octave=100, step_size=0.01,
     if create_video:
         height, width = img.shape[:2]
 
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v') 
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v") 
 
-        video_writer = cv2.VideoWriter('video.avi',fourcc,15.,(width,height))
+        video_writer = cv2.VideoWriter('video'+str(np.random.randint(10000))+'.avi', fourcc, 18.,(width,height))
 
 
     for octave in range(num_octaves):
@@ -195,8 +171,14 @@ def deep_dream(model, img, steps_per_octave=100, step_size=0.01,
             new_size = tf.cast(tf.convert_to_tensor(img.shape[:2]), tf.float32)*octave_scale
             img = tf.image.resize(img, tf.cast(new_size, tf.int32))
 
-        for step in range(steps_per_octave):
+        for step in tqdm(range(steps_per_octave)):
 
+            if rand_channel is not None:
+                if not step%rand_channel['every']:
+                    channels = np.random.choice(rand_channel['choices'], size=rand_channel['size'], replace=False)
+                    if 'verbose' in rand_channel:
+                        if rand_channel['verbose']:
+                            print('channels @ step', step, ':', sorted(channels))
 
             gradients = get_tiled_gradients(model, img, target=target, channels=channels)
             img = img + gradients*step_size
@@ -212,14 +194,14 @@ def deep_dream(model, img, steps_per_octave=100, step_size=0.01,
 
 
             if create_gif:
-                img_gif = model.deprocess_image(img, rescale=True)
+                img_gif = model.deprocess_image(img)
                 gif_writer.append_data(img_gif)
 
             if create_video:
-                img_video = cv2.cvtColor(model.deprocess_image(img, rescale=True), cv2.COLOR_RGB2BGR)
+                img_video = cv2.cvtColor(model.deprocess_image(img), cv2.COLOR_RGB2BGR)
                 video_writer.write(img_video)
 
-            if step % 1000 == 0:
+            if not (step+1)%20000:
                 show(model.deprocess_image(img))
                 print("Octave {}, Step {}".format(octave, step))
 
@@ -236,8 +218,7 @@ def deep_dream(model, img, steps_per_octave=100, step_size=0.01,
 
 
     result = model.deprocess_image(img)
-    show(result)
-
+    #show(result)
 
     return result
 
@@ -251,78 +232,24 @@ def random_roll(img, maxroll):
 
 
 
-def get_squeezenet_model(layers):
-
-    base_model = SqueezeNet(content_layers)
-
-    all_n = []
-    
-    all_n = get_ckpt_weights('../squeezenet_weights/squeezenet.ckpt')
-    all_weights = []
-    for w in base_model.model.weights:
-        all_weights.append(all_n[weight_to_weight[w.name]])
-    base_model.set_weights(all_weights)
-    base_model.trainable = False
-
-    dream_model = base_model 
-
-    return dream_model
-
-
-def get_keras_model(names, model_class, show_summary=False):
-    #base_model = iv3.InceptionV3(include_top=True, weights='imagenet')
-
-    print(dir(model_class))
-    base_model = getattr(model_class, dir(model_class)[0])(include_top=True, weights='imagenet')
-    if show_summary:
-        base_model.summary()
-
-
-    # Maximize the activations of these layers
-    layers = [base_model.get_layer(name).output for name in names]
-
-    if len(layers) == 1:
-        layers = layers[0]
-
-    # Create the feature extraction model
-    dream_model = tf.keras.Model(inputs=base_model.input, outputs=layers)
-
-
-    dream_model.preprocess_image = model_class.preprocess_input
-    dream_model.deprocess_image = deprocess
-    dream_model.clip_image = lambda img: tf.clip_by_value(img, -1., 1.)
-
-    return dream_model
-
-
 if __name__=='__main__':
 
     # TODO:
     # Target activations
-    # Neuron activations
-    # Zoom in
 
-
-
-    original_img = load_image('private/greg.jpg', size=448)
+    original_img = load_image('private/greg.jpg', size=512)
     #original_img = load_image('sky.jpg', size=384)
     #original_img = load_image('blackpool.jpg', size=512)
 
-    #original_img = np.random.uniform(low=0., high=1., size=original_img.shape)
+    #original_img = np.random.uniform(low=0., high=255., size=original_img.shape)
 
     print(original_img.shape)
 
-
     #show(original_img)
 
-    #shift_down, shift_right, img_rolled = random_roll(np.array(original_img), 512)
-    #print(shift_down, shift_right)
-    #show(img_rolled)
 
-
-    content_layers = [10]
-    dream_model = get_squeezenet_model(content_layers)
-
+    #content_layers = [10]
+    #dream_model = get_squeezenet_model(content_layers)
 
 
     #target_img = load_image('flowers.jpg', size=240)
@@ -331,20 +258,32 @@ if __name__=='__main__':
     #print(target.shape)
     target = None
 
-    #names = ['mixed2'] #['predictions'] # #, 'mixed9'] #['mixed3', 'mixed5'] #['mixed2']
+    #names = ['mixed8'] #['predictions'] # #, 'mixed9'] #['mixed3', 'mixed5'] #['mixed2']
     #names = ['add_11']
     #names = ['add_2']
-    #from tensorflow.keras.applications import inception_v3 as iv3
+    #names = ['normal_concat_7']
+    names = ['block_15_add']
+    from tensorflow.keras.applications import inception_v3 as iv3
+    from tensorflow.keras.applications import mobilenet_v2 as mb2
     #from tensorflow.keras.applications import xception as xce
     #from tensorflow.keras.applications import nasnet
-    #dream_model = get_keras_model(names, model_class=nasnet, show_summary=True)
 
-    channels = range(250, 270) # [28] #range(300, 305)
-    #channels = []
+    dream_model = get_keras_model(names, model_class=mb2, model_i=0, show_summary=True)
+    channels = range(50, 90) # [28] #range(300, 305)
+    #channels = None
 
-    dream_img = deep_dream(model=dream_model, img=original_img, step_size=0.08, 
-            steps_per_octave=400, target=target, channels=channels, zoom=1.025,
-            num_octaves=1, octave_scale=1.3, create_gif=False, create_video=True)
+    rand_channel = {
+        'every': 100,
+        'size': 5,
+        'choices': range(160),
+        'verbose': True
+    }
+    #rand_channel = None
+
+    dream_img = deep_dream(model=dream_model, img=original_img, step_size=0.06, 
+            steps_per_octave=1200, target=target, channels=channels, zoom=1,
+            num_octaves=1, octave_scale=1.3, create_gif=False, create_video=True,
+            rand_channel=rand_channel)
 
 
 
