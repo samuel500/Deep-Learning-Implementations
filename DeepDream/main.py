@@ -21,6 +21,11 @@ from utils import weight_to_weight, get_ckpt_weights
 import imageio
 
 
+import cv2
+
+
+
+
 import scipy.ndimage as nd
 
 
@@ -166,7 +171,8 @@ def get_tiled_gradients(model, img, tile_size=512, target=None, channels=None):
 
 
 def deep_dream(model, img, steps_per_octave=100, step_size=0.01,
-                                num_octaves=4, octave_scale=1.4, target=None, channels=None, zoom=1, create_gif=False):
+                                num_octaves=4, octave_scale=1.4, target=None, channels=None, zoom=1, 
+                                create_gif=False, create_video=False):
     #img = tf.keras.preprocessing.image.img_to_array(img)
     #img = iv3.preprocess_input(img)
     img = model.preprocess_image(img)
@@ -174,7 +180,14 @@ def deep_dream(model, img, steps_per_octave=100, step_size=0.01,
 
     if create_gif:
         gif_file =  'test' + str(np.random.randint(10000))  + '.gif'
-        writer = imageio.get_writer(gif_file, mode='I', duration=0.1)
+        gif_writer = imageio.get_writer(gif_file, mode='I', duration=0.07)
+    if create_video:
+        height, width = img.shape[:2]
+
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v') 
+
+        video_writer = cv2.VideoWriter('video.avi',fourcc,15.,(width,height))
+
 
     for octave in range(num_octaves):
         # Scale the image based on the octave
@@ -196,23 +209,31 @@ def deep_dream(model, img, steps_per_octave=100, step_size=0.01,
                 img = tf.image.resize(img, tf.cast(new_size, tf.int32))
 
                 img = tf.image.resize_with_crop_or_pad(img, img_y, img_x)
-                #img = img[(new_size[0]-img_y)//2:(new_size[0]-img_y)//2+img_y,
-                #    (new_size[1]-img_x)//2:(new_size[1]-img_x)//2+img_x,:]
+
 
             if create_gif:
                 img_gif = model.deprocess_image(img, rescale=True)
-                writer.append_data(img_gif)
-   
+                gif_writer.append_data(img_gif)
+
+            if create_video:
+                img_video = cv2.cvtColor(model.deprocess_image(img, rescale=True), cv2.COLOR_RGB2BGR)
+                video_writer.write(img_video)
 
             if step % 1000 == 0:
                 show(model.deprocess_image(img))
                 print("Octave {}, Step {}".format(octave, step))
+
         show(model.deprocess_image(img))
 
         print("Octave {}, Step {}".format(octave, step))
 
     if create_gif:
-        writer.close()
+        gif_writer.close()
+
+    if create_video:
+        cv2.destroyAllWindows()
+        video_writer.release()
+
 
     result = model.deprocess_image(img)
     show(result)
@@ -282,6 +303,7 @@ if __name__=='__main__':
     # Zoom in
 
 
+
     original_img = load_image('private/greg.jpg', size=448)
     #original_img = load_image('sky.jpg', size=384)
     #original_img = load_image('blackpool.jpg', size=512)
@@ -298,14 +320,14 @@ if __name__=='__main__':
     #show(img_rolled)
 
 
-    content_layers = [12]
+    content_layers = [10]
     dream_model = get_squeezenet_model(content_layers)
 
 
 
-    target_img = load_image('flowers.jpg', size=240)
-    target_img = dream_model.preprocess_image(target_img)
-    target = dream_model(target_img[None])[0]
+    #target_img = load_image('flowers.jpg', size=240)
+    #target_img = dream_model.preprocess_image(target_img)
+    #target = dream_model(target_img[None])[0]
     #print(target.shape)
     target = None
 
@@ -317,12 +339,12 @@ if __name__=='__main__':
     #from tensorflow.keras.applications import nasnet
     #dream_model = get_keras_model(names, model_class=nasnet, show_summary=True)
 
-    #channels = range(295, 300) # [28] #range(300, 305)
-    channels = None
+    channels = range(250, 270) # [28] #range(300, 305)
+    #channels = []
 
-    dream_img = deep_dream(model=dream_model, img=original_img, step_size=0.15, 
-            steps_per_octave=200, target=target, channels=channels, zoom=1.06,
-            num_octaves=1, octave_scale=1.3, create_gif=True)
+    dream_img = deep_dream(model=dream_model, img=original_img, step_size=0.08, 
+            steps_per_octave=400, target=target, channels=channels, zoom=1.025,
+            num_octaves=1, octave_scale=1.3, create_gif=False, create_video=True)
 
 
 
