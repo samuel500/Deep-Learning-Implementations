@@ -18,6 +18,9 @@ from squeezenet import SqueezeNet
 from utils import weight_to_weight, get_ckpt_weights
 
 
+import scipy.ndimage as nd
+
+
 
 # Normalize an image
 def deprocess(img):
@@ -35,38 +38,92 @@ def show(img):
 
 
 
-def calc_loss(img, model):
+def calc_loss(img, model, target=None, channels=None):
     # Pass forward the image through the model to retrieve the activations.
     # Converts the image into a batch of size 1.
     img_batch = tf.expand_dims(img, axis=0)
     #img_batch = img
     layer_activations = model(img_batch) #.numpy()
+
+    print(layer_activations[0].shape)
+    
     #print(layer_activations)
     #print('Predicted:', iv3.decode_predictions(layer_activations, top=5)[0])
 
+    if target is not None:
+        layer_activations = layer_activations[0]
+        print('las', layer_activations.shape)
+        print('ts', target.shape)
+        ch = target.shape[-1]
+        x = tf.reshape(layer_activations, (ch,-1))
+        y = tf.reshape(target, (ch,-1))
+        print('xs', x.shape)
+        print('ys', y.shape)
+        A = tf.matmul(x, y, transpose_a=True)
+        print('As', A.shape)
+        #raise
+        idx1 = np.array(range(x.shape[0]))
+        idx2 = tf.argmax(A, axis=0).numpy() #[:x.shape[1]]
+        Aa = np.array(A)
 
-    losses = []
-    if type(layer_activations) is list:
-        for act in layer_activations:
-            loss = tf.math.reduce_mean(act)
-            losses.append(loss)
+        print('amax Aa', np.amax(Aa))
+        print('mean Aa', np.mean(Aa))
+
+        print(idx1.shape)
+        print(idx2.shape)
+
+        s = list(zip(list(idx1), list(idx2)))
+        result = tf.gather_nd(x, s)
+        print(result.shape)
+
+        #diff = y[:,list(tf.argmax(A, axis=1).numpy())]
+        #return tf.math.reduce_mean(A)
+        return tf.math.reduce_mean(result)
+
+
+    elif channels is not None:
+   
+        if not hasattr(channels, '__iter__'):
+            channels = [channels]
+
+        C = layer_activations[0].shape[-1]
+
+        if max(channels) >= C:
+            raise IndexError("Invalid channel index:{} (max:{})".format(max(channels),C-1))
+
+        t = tf.gather(layer_activations[0], axis=3, batch_dims=0, indices=list(channels))
+
+        return tf.math.reduce_mean(t)
+
     else:
-        #t = np.zeros(1000)
-        #t = layer_activations
-        #t[0][594] = 1
+        losses = []
+        if type(layer_activations) is list:
+            for act in layer_activations:
+                loss = tf.math.reduce_mean(act)
+                losses.append(loss)
+        else:
+            #t = np.zeros(1000)
+            #t = layer_activations
+            #t[0][594] = 1
 
-        loss = tf.math.reduce_mean(layer_activations)
-        #loss = tf.math.reduce_mean(layer_activations)
-        losses.append(loss)
-    return tf.reduce_sum(losses)
+            loss = tf.math.reduce_mean(layer_activations)
+            #loss = tf.math.reduce_mean(layer_activations)
+            losses.append(loss)
 
+        return tf.reduce_sum(losses)
+
+
+def zoom_in():
+    pass
 
 #@tf.function
-def get_tiled_gradients(model, img, tile_size=512):
+def get_tiled_gradients(model, img, tile_size=512, target=None, channels=None):
     shift_down, shift_right, img_rolled = random_roll(img, tile_size)
 
     # Initialize the image gradients to zero.
     gradients = tf.zeros_like(img_rolled)
+
+    tot_loss = 0.
 
     for x in tf.range(0, img_rolled.shape[0], tile_size):
         for y in tf.range(0, img_rolled.shape[1], tile_size):
@@ -80,21 +137,16 @@ def get_tiled_gradients(model, img, tile_size=512):
                 #print(img_rolled.shape)
                 #print(x+tile_size)
                 img_tile = img_rolled[x:x+tile_size, y:y+tile_size]
-                print(img_tile.shape)
-                if min(img_tile.shape[:2]) < 15: # model does not accept inputs that are too small
-                    print('wowowow')
-                    pass    
+                if min(img_tile.shape[:2]) < 15: # keras model does not accept inputs that are too small
+                    continue    
                 else:
-                    loss = calc_loss(img_tile, model)
-                    print(loss)
+                    loss = calc_loss(img_tile, model, target, channels)
+                    tot_loss += float(loss) * np.prod(img_tile.shape[:2])/np.prod(img_rolled.shape[:2]) # add loss to total, weighted with size of tile
 
-            if min(img_tile.shape[:2]) < 15:
-                print('wowowo')
-                pass    
-            else:
-                # Update the image gradients for this tile.
-                gradients += tape.gradient(loss, img_rolled)
+            # Update the image gradients for this tile.
+            gradients += tape.gradient(loss, img_rolled)
 
+    print('tot_loss:', tot_loss)
     # Undo the random shift applied to the image and its gradients.
     gradients = tf.roll(tf.roll(gradients, -shift_right, axis=1), -shift_down, axis=0)
 
@@ -107,7 +159,7 @@ def get_tiled_gradients(model, img, tile_size=512):
 
 
 def deep_dream(model, img, steps_per_octave=100, step_size=0.01,
-                                num_octaves=4, octave_scale=1.3):
+                                num_octaves=4, octave_scale=1.3, target=None, channels=None):
     #img = tf.keras.preprocessing.image.img_to_array(img)
     #img = iv3.preprocess_input(img)
     img = model.preprocess_image(img)
@@ -119,7 +171,7 @@ def deep_dream(model, img, steps_per_octave=100, step_size=0.01,
             img = tf.image.resize(img, tf.cast(new_size, tf.int32))
 
         for step in range(steps_per_octave):
-            gradients = get_tiled_gradients(model, img)
+            gradients = get_tiled_gradients(model, img, target=target, channels=channels)
             img = img + gradients*step_size
             img = model.clip_image(img)
 
@@ -167,18 +219,19 @@ def get_keras_model(names, model_class, show_summary=False):
     base_model = getattr(model_class, dir(model_class)[0])(include_top=True, weights='imagenet')
     if show_summary:
         base_model.summary()
+
+
     # Maximize the activations of these layers
-
-
     layers = [base_model.get_layer(name).output for name in names]
-    #print(layers)
+
     if len(layers) == 1:
         layers = layers[0]
+
     # Create the feature extraction model
-    #print(base_model.model.input)
     dream_model = tf.keras.Model(inputs=base_model.input, outputs=layers)
 
-    dream_model.preprocess_image = iv3.preprocess_input
+
+    dream_model.preprocess_image = model_class.preprocess_input
     dream_model.deprocess_image = deprocess
     dream_model.clip_image = lambda img: tf.clip_by_value(img, -1., 1.)
 
@@ -187,14 +240,22 @@ def get_keras_model(names, model_class, show_summary=False):
 
 if __name__=='__main__':
 
+    # TODO:
+    # Target activations
+    # Neuron activations
+    # Zoom in
 
-    #original_img = load_image('private/greg.jpg', size=448)
-    #original_img = load_image('sky.jpg', size=512)
-    original_img = load_image('blackpool.jpg', size=512)
+    #m = tf.keras.applications.vgg16.VGG16(include_top=True, weights='imagenet')
+    #raise
 
-    original_img = np.random.uniform(low=0., high=1., size=original_img.shape)
+    original_img = load_image('private/greg.jpg', size=448)
+    #original_img = load_image('sky.jpg', size=384)
+    #original_img = load_image('blackpool.jpg', size=512)
+
+    #original_img = np.random.uniform(low=0., high=1., size=original_img.shape)
 
     print(original_img.shape)
+
 
     #show(original_img)
 
@@ -203,8 +264,16 @@ if __name__=='__main__':
     #show(img_rolled)
 
 
-    content_layers = [6]
+    content_layers = [10]
     dream_model = get_squeezenet_model(content_layers)
+
+
+
+    target_img = load_image('flowers.jpg', size=240)
+    target_img = dream_model.preprocess_image(target_img)
+    target = dream_model(target_img[None])[0]
+    print(target.shape)
+    target = None
 
     #names = ['mixed2'] #['predictions'] # #, 'mixed9'] #['mixed3', 'mixed5'] #['mixed2']
     #names = ['add_11']
@@ -214,8 +283,9 @@ if __name__=='__main__':
     #from tensorflow.keras.applications import nasnet
     #dream_model = get_keras_model(names, model_class=nasnet, show_summary=True)
 
+    channels = [50, 100, 150, 200]
+    dream_img = deep_dream(model=dream_model, img=original_img, step_size=0.05, steps_per_octave=10, target=target, channels=channels)
 
-    dream_img = deep_dream(model=dream_model, img=original_img, step_size=0.025, steps_per_octave=20)
 
 
     _, axarr = plt.subplots(1,2)
