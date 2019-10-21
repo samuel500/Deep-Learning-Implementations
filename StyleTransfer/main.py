@@ -128,10 +128,11 @@ def style_transfer(content_image, style_image, content_layers, content_weight,
                 im = Image.fromarray(image)
                 im.save(style_t_name + "_styled{}_t:{}.jpg".format(np.random.randint(10000), t))
 
-        if not t % 16: 
-            image = model.deprocess_image(img_var[0], rescale=True)
-            #image = Image.fromarray(image)
-            writer.append_data(image)
+        if create_gif:
+            if not t % 16: 
+                image = model.deprocess_image(img_var[0], rescale=True)
+                #image = Image.fromarray(image)
+                writer.append_data(image)
     if create_gif:
         writer.close()
 
