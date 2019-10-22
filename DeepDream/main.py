@@ -17,13 +17,9 @@ import cv2
 
 import scipy.ndimage as nd
 
-from image_utils import load_image
+from image_utils import load_image, show
 
 from models_utils import *
-
-
-
-
 
 
 
@@ -43,6 +39,7 @@ def calc_loss(img, model, target=None, channels=None):
         
         raise NotImplementedError
 
+        '''
         layer_activations = layer_activations[0]
         print('las', layer_activations.shape)
         print('ts', target.shape)
@@ -71,7 +68,7 @@ def calc_loss(img, model, target=None, channels=None):
         #diff = y[:,list(tf.argmax(A, axis=1).numpy())]
         #return tf.math.reduce_mean(A)
         return tf.math.reduce_mean(result)
-
+        '''
 
     elif channels is not None:
 
@@ -110,7 +107,6 @@ def get_tiled_gradients(model, img, tile_size=1024, target=None, channels=None):
     gradients = tf.zeros_like(img_rolled)
 
     tot_loss = 0.
-
     for x in tf.range(0, img_rolled.shape[0], tile_size):
         for y in tf.range(0, img_rolled.shape[1], tile_size):
             # Calculate the gradients for this tile.
@@ -142,25 +138,38 @@ def get_tiled_gradients(model, img, tile_size=1024, target=None, channels=None):
     #gradients /= tf.math.reduce_std(gradients) + 1e-8
     #print('std', tf.math.reduce_std(gradients))
     #print('mean', np.abs(gradients).mean())
-    gradients /= np.abs(gradients).mean() + 1e-8
+    gradients /= tf.math.reduce_mean(tf.math.abs(gradients)) + 1e-8
     return gradients
 
 
-def deep_dream(model, img, steps_per_octave=100, step_size=0.01,
-                                num_octaves=4, octave_scale=1.4, target=None, channels=None, zoom=1, 
+def deep_dream(model, img, steps_per_octave=10, step_size=0.01,
+                                num_octaves=4, octave_scale=1.3, target=None, channels=None, zoom=1, 
                                 create_gif=False, create_video=False, rand_channel=None):
-    #img = tf.keras.preprocessing.image.img_to_array(img)
-    #img = iv3.preprocess_input(img)
+    """
+    Inputs:
+    :model: model to extract layer activation
+    :img: starting image
+    :steps_per_octave: number of alteration steps for each octave
+    :step_size: size of each gradient alteration
+    :num_octaves: number of scale changes
+    :octave_scale: image size change per octave
+    :channels: channels to maximize
+    :zoom: size of zoom to apply per training step (1 = no zoom)
+    :create_gif: create gif of training
+    :create_video: create video of training
+    :rand_channel: instruction dict to randomly change the channels to maximize at regular interval (for variation)
+    """
+
     img = model.preprocess_image(img)
 
 
     if create_gif:
-        gif_file =  'test' + str(np.random.randint(10000))  + '.gif'
-        gif_writer = imageio.get_writer(gif_file, mode='I', duration=0.07)
+        gif_file =  'deep_dream' + str(np.random.randint(10000))  + '.gif'
+        gif_writer = imageio.get_writer(gif_file, mode='I', duration=0.17)
     if create_video:
         height, width = img.shape[:2]
 
-        fourcc = cv2.VideoWriter_fourcc(*"mp4v") 
+        fourcc = cv2.VideoWriter_fourcc(*"X264") 
 
         video_writer = cv2.VideoWriter('video'+str(np.random.randint(10000))+'.avi', fourcc, 18.,(width,height))
 
@@ -194,8 +203,9 @@ def deep_dream(model, img, steps_per_octave=100, step_size=0.01,
 
 
             if create_gif:
-                img_gif = model.deprocess_image(img)
-                gif_writer.append_data(img_gif)
+                if step%17:
+                    img_gif = model.deprocess_image(img)
+                    gif_writer.append_data(img_gif)
 
             if create_video:
                 img_video = cv2.cvtColor(model.deprocess_image(img), cv2.COLOR_RGB2BGR)
@@ -218,7 +228,6 @@ def deep_dream(model, img, steps_per_octave=100, step_size=0.01,
 
 
     result = model.deprocess_image(img)
-    #show(result)
 
     return result
 
@@ -234,14 +243,14 @@ def random_roll(img, maxroll):
 
 if __name__=='__main__':
 
-    # TODO:
-    # Target activations
 
-    original_img = load_image('private/greg.jpg', size=512)
+    #original_img = load_image('private/greg.jpg', size=512)
     #original_img = load_image('sky.jpg', size=384)
-    #original_img = load_image('blackpool.jpg', size=512)
+    original_img = load_image('blackpool.jpg', size=448)
+    #print(original_img.shape)
 
-    #original_img = np.random.uniform(low=0., high=255., size=original_img.shape)
+
+    #original_img = np.random.uniform(low=0., high=255., size=(447, 712, 3))
 
     print(original_img.shape)
 
@@ -256,6 +265,7 @@ if __name__=='__main__':
     #target_img = dream_model.preprocess_image(target_img)
     #target = dream_model(target_img[None])[0]
     #print(target.shape)
+
     target = None
 
     #names = ['mixed8'] #['predictions'] # #, 'mixed9'] #['mixed3', 'mixed5'] #['mixed2']
@@ -263,26 +273,26 @@ if __name__=='__main__':
     #names = ['add_2']
     #names = ['normal_concat_7']
     names = ['block_15_add']
-    from tensorflow.keras.applications import inception_v3 as iv3
+    #from tensorflow.keras.applications import inception_v3 as iv3
     from tensorflow.keras.applications import mobilenet_v2 as mb2
     #from tensorflow.keras.applications import xception as xce
     #from tensorflow.keras.applications import nasnet
 
-    dream_model = get_keras_model(names, model_class=mb2, model_i=0, show_summary=True)
+    dream_model = get_keras_model(names, model_class=mb2, model_i=0, show_summary=False)
     channels = range(50, 90) # [28] #range(300, 305)
     #channels = None
 
     rand_channel = {
         'every': 100,
-        'size': 5,
+        'size': 20,
         'choices': range(160),
         'verbose': True
     }
     #rand_channel = None
 
-    dream_img = deep_dream(model=dream_model, img=original_img, step_size=0.06, 
-            steps_per_octave=1200, target=target, channels=channels, zoom=1,
-            num_octaves=1, octave_scale=1.3, create_gif=False, create_video=True,
+    dream_img = deep_dream(model=dream_model, img=original_img, step_size=0.2, 
+            steps_per_octave=100, target=target, channels=channels, zoom=1.015,
+            num_octaves=1, octave_scale=1.3, create_gif=True, create_video=False,
             rand_channel=rand_channel)
 
 

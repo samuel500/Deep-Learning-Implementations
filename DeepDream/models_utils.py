@@ -7,6 +7,7 @@ import numpy as np
 
 from utils import weight_to_weight, get_ckpt_weights
 
+
 # Normalize an image
 def deprocess(img):
     img = 255*(img + 1.0)/2.0

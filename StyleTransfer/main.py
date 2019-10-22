@@ -24,7 +24,6 @@ from utils import weight_to_weight, get_ckpt_weights
 
 
 
-
 def style_transfer(content_image, style_image, content_layers, content_weight,
                    style_layers, style_weights, total_variation_weight, model, 
                    init_random=False, create_gif=False, save_images=True, show_interval=50,
@@ -38,9 +37,10 @@ def style_transfer(content_image, style_image, content_layers, content_weight,
     :style_layers: list of layers to use for style loss
     :style_weights: list of weights to use for each layer in style_layers
     :total_variation_weight: weight of total variation regularization loss term
+    :model: model to extract content and style features
     :init_random: initialize the starting image to uniform random noise
     :create_gif: create a gif of the training progress
-    :save_images: save styled image at interval
+    :save_images: save styled image at intervals
     :show_interval: display styled image at iteration interval
     :max_iter: stop training after max_iter training iterations
     :image_size: size to rescale smallest image dimension to
@@ -71,7 +71,6 @@ def style_transfer(content_image, style_image, content_layers, content_weight,
     else:
         img_var = tf.Variable(content_img[None])
 
-    
 
     lr_var = tf.Variable(lr)
     optimizer = tf.keras.optimizers.Adam(learning_rate=lr_var)
