@@ -26,6 +26,8 @@ https://ai.googleblog.com/2015/06/inceptionism-going-deeper-into-neural.html
 
 https://www.tensorflow.org/tutorials/generative/deepdream
 
+http://cs231n.stanford.edu/slides/2017/cs231n_2017_lecture12.pdf
+
 https://github.com/google/deepdream/blob/master/dream.ipynb
 
 https://colab.research.google.com/drive/1DWcrN9WXni58MbddvlShX0wF_oeo8W_0

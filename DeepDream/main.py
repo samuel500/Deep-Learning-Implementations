@@ -165,7 +165,7 @@ def deep_dream(model, img, steps_per_octave=10, step_size=0.01,
 
     if create_gif:
         gif_file =  'deep_dream' + str(np.random.randint(10000))  + '.gif'
-        gif_writer = imageio.get_writer(gif_file, mode='I', duration=0.17)
+        gif_writer = imageio.get_writer(gif_file, mode='I', duration=0.2)
     if create_video:
         height, width = img.shape[:2]
 
@@ -203,7 +203,7 @@ def deep_dream(model, img, steps_per_octave=10, step_size=0.01,
 
 
             if create_gif:
-                if step%17:
+                if not step%6:
                     img_gif = model.deprocess_image(img)
                     gif_writer.append_data(img_gif)
 
@@ -215,7 +215,7 @@ def deep_dream(model, img, steps_per_octave=10, step_size=0.01,
                 show(model.deprocess_image(img))
                 print("Octave {}, Step {}".format(octave, step))
 
-        show(model.deprocess_image(img))
+        #show(model.deprocess_image(img))
 
         print("Octave {}, Step {}".format(octave, step))
 
@@ -283,15 +283,15 @@ if __name__=='__main__':
     #channels = None
 
     rand_channel = {
-        'every': 100,
-        'size': 20,
+        'every': 200,
+        'size': 40,
         'choices': range(160),
         'verbose': True
     }
     #rand_channel = None
 
-    dream_img = deep_dream(model=dream_model, img=original_img, step_size=0.2, 
-            steps_per_octave=100, target=target, channels=channels, zoom=1.015,
+    dream_img = deep_dream(model=dream_model, img=original_img, step_size=0.18, 
+            steps_per_octave=150, target=target, channels=channels, zoom=1.008,
             num_octaves=1, octave_scale=1.3, create_gif=True, create_video=False,
             rand_channel=rand_channel)
 
