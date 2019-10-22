@@ -1,5 +1,6 @@
 # Deep Dream
 
+![alt text](https://github.com/samuel500/Deep-Learning-Implementations/blob/master/DeepDream/deep_dream5748.gif)
 
 
 # Notes
