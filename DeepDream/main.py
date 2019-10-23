@@ -22,6 +22,9 @@ from image_utils import load_image, show
 from models_utils import *
 
 
+from PIL import ImageFont
+from PIL import ImageDraw 
+
 
 def calc_loss(img, model, target=None, channels=None):
     # Pass forward the image through the model to retrieve the activations.
@@ -144,7 +147,8 @@ def get_tiled_gradients(model, img, tile_size=1024, target=None, channels=None):
 
 def deep_dream(model, img, steps_per_octave=10, step_size=0.01,
                                 num_octaves=4, octave_scale=1.3, target=None, channels=None, zoom=1, 
-                                create_gif=False, create_video=False, rand_channel=None):
+                                create_gif=False, create_video=False, rand_channel=None,
+                                loop_channel=None):
     """
     Inputs:
     :model: model to extract layer activation
@@ -189,6 +193,16 @@ def deep_dream(model, img, steps_per_octave=10, step_size=0.01,
                         if rand_channel['verbose']:
                             print('channels @ step', step, ':', sorted(channels))
 
+            if loop_channel is not None:
+                if channels is None:
+                    channels = [0]
+                if not step%loop_channel['every']:
+                    if step:
+                        channels[0] += 1
+                    if 'verbose' in loop_channel:
+                        if loop_channel['verbose']:
+                            print('channels @ step', step, ':', sorted(channels))
+
             gradients = get_tiled_gradients(model, img, target=target, channels=channels)
             img = img + gradients*step_size
             img = model.clip_image(img)
@@ -208,7 +222,25 @@ def deep_dream(model, img, steps_per_octave=10, step_size=0.01,
                     gif_writer.append_data(img_gif)
 
             if create_video:
-                img_video = cv2.cvtColor(model.deprocess_image(img), cv2.COLOR_RGB2BGR)
+
+                img_v = model.deprocess_image(img)
+
+                if loop_channel is not None:
+                    font                   = cv2.FONT_HERSHEY_SIMPLEX
+                    bottomLeftCornerOfText = (10, img_v.shape[0]-20)
+                    fontScale              = 1
+                    fontColor              = (0,0,0)
+                    lineType               = 2
+
+                    img_v = cv2.putText(img_v, str(channels[0]), 
+                        bottomLeftCornerOfText, 
+                        font, 
+                        fontScale,
+                        fontColor,
+                        lineType)
+
+
+                img_video = cv2.cvtColor(img_v, cv2.COLOR_RGB2BGR)
                 video_writer.write(img_video)
 
             if not (step+1)%20000:
@@ -246,7 +278,7 @@ if __name__=='__main__':
 
     #original_img = load_image('private/greg.jpg', size=512)
     #original_img = load_image('sky.jpg', size=384)
-    original_img = load_image('blackpool.jpg', size=448)
+    original_img = load_image('blackpool.jpg', size=512)
     #print(original_img.shape)
 
 
@@ -266,34 +298,41 @@ if __name__=='__main__':
     #target = dream_model(target_img[None])[0]
     #print(target.shape)
 
-    target = None
 
     #names = ['mixed8'] #['predictions'] # #, 'mixed9'] #['mixed3', 'mixed5'] #['mixed2']
     #names = ['add_11']
     #names = ['add_2']
     #names = ['normal_concat_7']
-    names = ['block_15_add']
+    
+    names = ['block_12_add'] #['block_9_add'] #['Conv_1_bn'] #['block_13_project_BN'] #['block_12_add'] #['block_16_project'] #['block_15_add']
     #from tensorflow.keras.applications import inception_v3 as iv3
     from tensorflow.keras.applications import mobilenet_v2 as mb2
     #from tensorflow.keras.applications import xception as xce
     #from tensorflow.keras.applications import nasnet
 
     dream_model = get_keras_model(names, model_class=mb2, model_i=0, show_summary=False)
-    channels = range(50, 90) # [28] #range(300, 305)
-    #channels = None
-
+    #channels = range(50, 60) # [28] #range(300, 305)
+    channels = None
+    #raise
     rand_channel = {
         'every': 200,
-        'size': 40,
-        'choices': range(160),
+        'size': 1,
+        'choices': range(96),
         'verbose': True
     }
-    #rand_channel = None
+    rand_channel = None
 
-    dream_img = deep_dream(model=dream_model, img=original_img, step_size=0.18, 
-            steps_per_octave=150, target=target, channels=channels, zoom=1.008,
-            num_octaves=1, octave_scale=1.3, create_gif=True, create_video=False,
-            rand_channel=rand_channel)
+    loop_channel = {
+        'every': 180,
+        'choices':range(96),
+        'verbose': True
+    }
+    #loop_channel = None
+
+    dream_img = deep_dream(model=dream_model, img=original_img, step_size=0.12, 
+            steps_per_octave=17280, channels=channels, zoom=1.012,
+            num_octaves=1, octave_scale=1.3, create_gif=False, create_video=True,
+            rand_channel=rand_channel, loop_channel=loop_channel)
 
 
 

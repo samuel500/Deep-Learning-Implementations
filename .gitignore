@@ -1,3 +1,5 @@
 __pycache__/
+private/
+Pix2Pix/
 *.pyc
 *.pyo

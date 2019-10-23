@@ -197,12 +197,8 @@ if __name__=='__main__':
     sw = 0.012
 
     params1 = {
-        #'content_image' : 'private/greg.jpg',
-        #'content_image' : 'private/kris.jpg',
-        #'content_image' : 'private/whats.jpeg',
-        
-        'content_image' : 'styles/blackpool.jpg',
 
+        'content_image' : 'styles/blackpool.jpg',
 
         #'style_image' : 'styles/composition_vii.jpg',
         #'style_image' : 'styles/muse.jpg',

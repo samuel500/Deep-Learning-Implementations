@@ -34,7 +34,13 @@ def get_squeezenet_model(layers):
 
 
 def get_keras_model(names, model_class, model_i=0, show_summary=False):
-    #base_model = iv3.InceptionV3(include_top=True, weights='imagenet')
+    """
+    Inputs:
+    :names: name of the layer(s) to maximize
+    :mode_class: keras class of the model
+    :model_i: if keras class has more than one model
+    :show_summary: display model summary (all layers)
+    """
 
     print(dir(model_class))
     base_model = getattr(model_class, dir(model_class)[model_i])(include_top=True, weights='imagenet')
