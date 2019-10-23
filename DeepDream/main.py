@@ -22,9 +22,6 @@ from image_utils import load_image, show
 from models_utils import *
 
 
-from PIL import ImageFont
-from PIL import ImageDraw 
-
 
 def calc_loss(img, model, target=None, channels=None):
     # Pass forward the image through the model to retrieve the activations.
@@ -303,7 +300,7 @@ if __name__=='__main__':
     #names = ['add_11']
     #names = ['add_2']
     #names = ['normal_concat_7']
-    
+
     names = ['block_12_add'] #['block_9_add'] #['Conv_1_bn'] #['block_13_project_BN'] #['block_12_add'] #['block_16_project'] #['block_15_add']
     #from tensorflow.keras.applications import inception_v3 as iv3
     from tensorflow.keras.applications import mobilenet_v2 as mb2
