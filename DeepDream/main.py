@@ -301,7 +301,7 @@ if __name__=='__main__':
     #names = ['add_2']
     #names = ['normal_concat_7']
 
-    names = ['block_12_add'] #['block_9_add'] #['Conv_1_bn'] #['block_13_project_BN'] #['block_12_add'] #['block_16_project'] #['block_15_add']
+    names = ['block_15_add'] #['block_9_add'] #['Conv_1_bn'] #['block_13_project_BN'] #['block_12_add'] #['block_16_project'] #['block_15_add']
     #from tensorflow.keras.applications import inception_v3 as iv3
     from tensorflow.keras.applications import mobilenet_v2 as mb2
     #from tensorflow.keras.applications import xception as xce
@@ -321,13 +321,13 @@ if __name__=='__main__':
 
     loop_channel = {
         'every': 180,
-        'choices':range(96),
+        'choices':range(160),
         'verbose': True
     }
     #loop_channel = None
 
     dream_img = deep_dream(model=dream_model, img=original_img, step_size=0.12, 
-            steps_per_octave=17280, channels=channels, zoom=1.012,
+            steps_per_octave=28800, channels=channels, zoom=1.012,
             num_octaves=1, octave_scale=1.3, create_gif=False, create_video=True,
             rand_channel=rand_channel, loop_channel=loop_channel)
 
