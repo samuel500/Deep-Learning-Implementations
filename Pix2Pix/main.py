@@ -38,6 +38,7 @@ def discriminator_loss(disc_real_output, disc_generated_output, loss_object):
 
 	return total_disc_loss
 
+
 def generator_loss(disc_generated_output, gen_output, target, loss_object):
 	gan_loss = loss_object(tf.ones_like(disc_generated_output), disc_generated_output)
 
@@ -49,13 +50,13 @@ def generator_loss(disc_generated_output, gen_output, target, loss_object):
 	return total_gen_loss
 
 
-
 def generate_images(model, test_input, tar):
 	# the training=True is intentional here since
 	# we want the batch statistics while running the model
 	# on the test dataset. If we use training=False, we will get
 	# the accumulated statistics learned from the training dataset
 	# (which we don't want)
+
 	prediction = model(test_input, training=True)
 	plt.figure(figsize=(15,15))
 
@@ -82,15 +83,11 @@ def train_step(input_image, target, generator, discriminator, loss_object, gener
 		gen_loss = generator_loss(disc_generated_output, gen_output, target, loss_object)
 		disc_loss = discriminator_loss(disc_real_output, disc_generated_output, loss_object)
 
-	generator_gradients = gen_tape.gradient(gen_loss,
-	                                  generator.trainable_variables)
-	discriminator_gradients = disc_tape.gradient(disc_loss,
-	                                       discriminator.trainable_variables)
+	generator_gradients = gen_tape.gradient(gen_loss, generator.trainable_variables)
+	discriminator_gradients = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
 
-	generator_optimizer.apply_gradients(zip(generator_gradients,
-	                                  generator.trainable_variables))
-	discriminator_optimizer.apply_gradients(zip(discriminator_gradients,
-	                                      discriminator.trainable_variables))
+	generator_optimizer.apply_gradients(zip(generator_gradients, generator.trainable_variables))
+	discriminator_optimizer.apply_gradients(zip(discriminator_gradients, discriminator.trainable_variables))
 
 
 def fit(train_ds, epochs, test_ds, generator, discriminator):

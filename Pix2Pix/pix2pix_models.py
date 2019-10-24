@@ -101,7 +101,6 @@ class Generator(tf.keras.Model):
 
 		self.concat = Concatenate()
 
-		#self.inputs = Input(shape=[None,None,3])
 
 	def call(self, x, **kwargs):
 
@@ -122,6 +121,7 @@ class Generator(tf.keras.Model):
 
 		return x
 
+
 class Discriminator(tf.keras.Model):
 
 	def __init__(self, **kwargs):
@@ -129,13 +129,10 @@ class Discriminator(tf.keras.Model):
 
 		initializer = tf.random_normal_initializer(0., 0.02)
 
-		#inp = tf.keras.layers.Input(shape=[None, None, 3], name='input_image')
-		#tar = tf.keras.layers.Input(shape=[None, None, 3], name='target_image')
 
 		self.concat = Concatenate()
 
 
-		# x = tf.keras.layers.concatenate([inp, tar]) # (bs, 256, 256, channels*2)
 		seq_layers = [
 
 			DownSample(64, 4, False), # (bs, 128, 128, 64)

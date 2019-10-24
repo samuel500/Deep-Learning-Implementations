@@ -223,18 +223,13 @@ def deep_dream(model, img, steps_per_octave=10, step_size=0.01,
                 img_v = model.deprocess_image(img)
 
                 if loop_channel is not None:
-                    font                   = cv2.FONT_HERSHEY_SIMPLEX
-                    bottomLeftCornerOfText = (10, img_v.shape[0]-20)
-                    fontScale              = 1
-                    fontColor              = (0,0,0)
-                    lineType               = 2
-
-                    img_v = cv2.putText(img_v, str(channels[0]), 
-                        bottomLeftCornerOfText, 
-                        font, 
-                        fontScale,
-                        fontColor,
-                        lineType)
+        
+                    img_v = cv2.putText(img_v, text=str(channels[0]), 
+                        org=(10, img_v.shape[0]-20), 
+                        fontFace=cv2.FONT_HERSHEY_SIMPLEX, 
+                        fontScale=1,
+                        color=(0,0,0), # black
+                        thickness=2)
 
 
                 img_video = cv2.cvtColor(img_v, cv2.COLOR_RGB2BGR)
