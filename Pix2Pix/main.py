@@ -1,6 +1,9 @@
 """
 Implementation of:
 https://arxiv.org/pdf/1611.07004.pdf
+
+Following closely:
+https://www.tensorflow.org/tutorials/generative/cyclegan
 """
 
 import tensorflow as tf
@@ -150,6 +153,7 @@ if __name__=='__main__':
 
 
 	discriminator = Discriminator()
+
 	disc_out = discriminator([inp[tf.newaxis,...], gen_output], training=False)
 	plt.imshow(disc_out[0,...,-1], vmin=-20, vmax=20, cmap='RdBu_r')
 	plt.colorbar()
@@ -167,21 +171,15 @@ if __name__=='__main__':
 	test_dataset = test_dataset.batch(BATCH_SIZE)
 
 
+	train = False
 
-	# EPOCHS = 150
+	if train:
+		EPOCHS = 150
 
-	# fit(train_dataset, EPOCHS, test_dataset, generator, discriminator)
+		fit(train_dataset, EPOCHS, test_dataset, generator, discriminator)
 
-	# Run the trained model on the entire test dataset
 
-	generator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
-	discriminator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
-
-	checkpoint_dir = './training_checkpoints'
-	checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
-	checkpoint = tf.train.Checkpoint(generator_optimizer=generator_optimizer,
-	                                 discriminator_optimizer=discriminator_optimizer,
-	                                 generator=generator,
+	checkpoint = tf.train.Checkpoint(generator=generator,
 	                                 discriminator=discriminator)
 	checkpoint.restore('/home/sam/DL_big_files/Pix2Pix/ckpt-7')
 
