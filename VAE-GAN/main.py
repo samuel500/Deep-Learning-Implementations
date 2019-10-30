@@ -192,11 +192,11 @@ def compute_loss(vae_generator, discriminator, x, beta):
     print('gen_l', gen_loss)
     print('discl', disc_loss)
 
-    disc_loss *= 0.2
+    disc_loss *= 0.5
 
 
     en_loss = rec_loss+kl_loss
-    de_loss = rec_loss+gen_loss
+    de_loss = 0.4*rec_loss+gen_loss
 
     return en_loss, de_loss, disc_loss
 
@@ -218,9 +218,11 @@ if __name__=="__main__":
     input_shape = (28, 28, 1)
     disc_layers = [
         InputLayer(input_shape=input_shape),
-        Conv2D(4, 3, strides=3, padding='same'),
+        Conv2D(32, 3, strides=1, padding='same'),
         LeakyReLU(),
-        Conv2D(8, 3, strides=3, padding='same'),
+        Conv2D(64, 4, strides=2, padding='same'),
+        LeakyReLU(),
+        Conv2D(64, 4, strides=2, padding='same'),
         LeakyReLU(),
         Flatten(),
         Dense(1)
@@ -232,12 +234,12 @@ if __name__=="__main__":
     generator = VAE(input_shape=input_shape, latent_dim=256)
     generator.summary()
 
-    encoder_optimizer = tf.keras.optimizers.Adam(1e-3)
-    decoder_optimizer = tf.keras.optimizers.Adam(1e-3)
-    discriminator_optimizer = tf.keras.optimizers.Adam(1e-3)
-    for test_images, labels in test_ds:
-        #generator.test(test_images)
-        break
+    encoder_optimizer = tf.keras.optimizers.Adam(5e-4)
+    decoder_optimizer = tf.keras.optimizers.Adam(5e-4)
+    discriminator_optimizer = tf.keras.optimizers.Adam(5e-4)
+    # for test_images, labels in test_ds:
+    #     #generator.test(test_images)
+    #     break
 
     
     beta = tf.Variable(1.)
@@ -246,7 +248,7 @@ if __name__=="__main__":
         st = time()
         for i, (images, labels) in enumerate(train_ds):
             print(i)
-            if not (i+1)%100:
+            if not (i+1)%234:
                 print('hello')
                 for test_images, labels in test_ds:
                     generator.test(test_images)
