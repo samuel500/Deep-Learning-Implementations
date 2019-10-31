@@ -3,7 +3,6 @@ Implementation of:
 https://arxiv.org/pdf/1512.09300.pdf
 """
 
-
 import tensorflow as tf
 from time import time
 import numpy as np
@@ -33,7 +32,6 @@ x_test = x_test[..., tf.newaxis]
 
 
 train_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(10000).batch(128)
-
 test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test)).batch(128)
 
 
@@ -131,15 +129,13 @@ class VAE(Model):
     def test(self, x):
         n = 5
         samples = np.random.choice(len(x), n**2, replace=False)
-        #samples.sort()
+
         x = np.array(x)
         x = x[samples,:]
-        #print(x[0])
-        #print(x.shape)
+
         preds = self.call(x, training=False)
         preds = np.array(preds)
-        #print(preds[0])
-        #print(preds)
+
         imd = 28
         canvas_orig = np.empty((imd*n , 2*imd * n+1, 1))
         for i in range(n):
@@ -156,25 +152,10 @@ class VAE(Model):
         print(canvas_orig.shape)
 
         plt.figure(figsize=(n*2+1, n))
+        plt.axis('off')
         plt.imshow(canvas_orig[:,:,0], origin="upper", cmap='gray')
         plt.draw()
         plt.show()
-        
-        # canvas_orig = np.empty((imd*n , imd * n, 1))
-        # for i in range(n):
-        #     g = preds[i*n:i*n+n]
-
-        #     for j in range(n):
-        #         canvas_orig[i * imd:(i + 1) * imd, j * imd:(j + 1) * imd] = \
-        #             g[j].reshape([imd, imd, 1])
-        # # print(min(canvas_orig))
-        # # print(max(canvas_orig))
-        # plt.figure(figsize=(n, n))
-        # plt.imshow(canvas_orig[:,:,0], origin="upper", cmap='gray') #, vmin=min(canvas_orig), vmax=max(canvas_orig))
-        # plt.draw()
-        # plt.show()
-        
-
 
 
 #@tf.function
@@ -185,10 +166,6 @@ def compute_loss(vae_generator, discriminator, x, beta, gamma, gen_dec_weight):
     z2 = tf.random.normal(shape=z.shape)
     y2 = vae_generator.decoder(z2)
 
-    #print(y.shape)
-    #print(x.shape)
-
-    
 
     real_output = discriminator(x, training=True)
     fake_output = discriminator(tf.sigmoid(y), training=True)
@@ -198,9 +175,7 @@ def compute_loss(vae_generator, discriminator, x, beta, gamma, gen_dec_weight):
     disc_loss = discriminator_loss(real_output, fake_output, fake_output2)
 
 
-
     rec_loss = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(logits=y, labels=x), axis=[1,2,3])
-    # print(tf.math.reduce_max(rec_loss))
     rec_loss = tf.reduce_mean(rec_loss)
     # y = tf.sigmoid(y)
     # #y2 = tf.sigmoid(y2)
@@ -208,19 +183,9 @@ def compute_loss(vae_generator, discriminator, x, beta, gamma, gen_dec_weight):
     # rec_loss = tf.reduce_mean(rec_loss)
 
 
-
-
     kl_loss = -0.5*tf.math.reduce_sum((1 + logvar - tf.square(mean) - tf.exp(logvar)), axis=1)
-    #kl_loss *= 0
-    # https://openreview.net/forum?id=Sy2fzU9gl
-  
-    kl_loss = tf.reduce_mean(kl_loss)
+    kl_loss = tf.reduce_mean(kl_loss) # https://openreview.net/forum?id=Sy2fzU9gl
     kl_loss *= beta
-
-    # print('kl', kl_loss)
-    # print('recl', rec_loss)
-    # print('gen_l', gen_loss)
-    # print('discl', disc_loss)
 
     #disc_loss *= 0.5
 
@@ -277,28 +242,19 @@ if __name__=='__main__':
     encoder_optimizer = tf.keras.optimizers.Adam(1e-4)
     decoder_optimizer = tf.keras.optimizers.Adam(1e-4)
     discriminator_optimizer = tf.keras.optimizers.Adam(1e-4)
-    # for test_images, labels in test_ds:
-    #     #generator.test(test_images)
-    #     break
 
 
     beta = tf.Variable(1.)
     gamma = tf.Variable(1.)
-    gen_dec = tf.Variable(0.)
-    #gamma = tf.Variable(0.1)
-    #print(dir(train_ds))
+    gen_dec = tf.Variable(1.)
+
     for e in range(100):
         print(e)
         st = time()
 
 
         for i, (images, labels) in enumerate(tqdm(train_ds)):
-            #print(i)
-            # if not (i+1)%234:
-            #     #print('hello')
-            #     for test_images, labels in test_ds:
-            #         generator.test(test_images)
-            #         break
+
             images = tf.dtypes.cast(images, tf.float32)
 
             with tf.GradientTape() as tape1, tf.GradientTape() as tape2, tf.GradientTape() as tape3: 
@@ -307,19 +263,18 @@ if __name__=='__main__':
             if not (i+1)%90:
                 print(i, info)
 
+
             gradients_of_encoder = tape1.gradient(en_loss, generator.encoder.trainable_variables)
-            gradients_of_decoder = tape2.gradient(de_loss, generator.decoder.trainable_variables)
-
-
             encoder_optimizer.apply_gradients(zip(gradients_of_encoder, generator.encoder.trainable_variables))
+
+
+            gradients_of_decoder = tape2.gradient(de_loss, generator.decoder.trainable_variables)
             decoder_optimizer.apply_gradients(zip(gradients_of_decoder, generator.decoder.trainable_variables))
             
-            
 
-            #if e > 2:
-            #    gen_dec = tf.Variable(5.)
             gradients_of_discriminator = tape3.gradient(disc_loss, discriminator.trainable_variables)
             discriminator_optimizer.apply_gradients(zip(gradients_of_discriminator, discriminator.trainable_variables))
+
         print(time()-st)
 
         for test_images, labels in test_ds:
