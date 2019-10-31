@@ -13,6 +13,8 @@ from tensorflow.keras.layers import Dense, Flatten, Conv2D, InputLayer, Layer, M
 from tensorflow.keras import Model
 import matplotlib.pyplot as plt
 
+from tqdm import tqdm
+
 
 mnist = tf.keras.datasets.mnist
 cifar10 = tf.keras.datasets.cifar10
@@ -48,13 +50,11 @@ class VAE(Model):
         self.encoder = tf.keras.Sequential(
             [
                 InputLayer(input_shape=input_shape),
-                Conv2D(filters=16, kernel_size=3, strides=2, activation='relu'), 
+                Conv2D(filters=16, kernel_size=4, strides=2, activation='relu'), 
                 BatchNormalization(),
-                Conv2D(filters=32, kernel_size=3, strides=2, activation='relu'), 
+                Conv2D(filters=32, kernel_size=4, strides=2, activation='relu'), 
                 BatchNormalization(),
-                Conv2D(filters=64, kernel_size=3, strides=1, activation='relu'), 
-                BatchNormalization(),
-                Conv2D(filters=128, kernel_size=3, strides=1, activation='relu'), 
+                Conv2D(filters=64, kernel_size=3, strides=2, activation='relu'), 
                 Flatten(),
                 Dense(latent_dim + latent_dim),
             ],
@@ -64,20 +64,22 @@ class VAE(Model):
         self.decoder = tf.keras.Sequential(
             [
                 tf.keras.layers.InputLayer(input_shape=(latent_dim,)),
-                tf.keras.layers.Dense(units=2**2*128, activation=tf.nn.relu),
-                tf.keras.layers.Reshape(target_shape=(-1, 1, 2**2*128)),
+                tf.keras.layers.Dense(units=2**2*64, activation=tf.nn.relu),
+                tf.keras.layers.Reshape(target_shape=(-1, 1, 2**2*64)),
+                tf.keras.layers.Conv2DTranspose(
+                    filters=128,
+                    kernel_size=4,
+                    strides=2,
+                    activation='relu'),
                 tf.keras.layers.Conv2DTranspose(
                     filters=64,
                     kernel_size=4,
                     strides=2,
                     activation='relu'),
+                #BatchNormalization(),
+
                 tf.keras.layers.Conv2DTranspose(
                     filters=32,
-                    kernel_size=4,
-                    strides=2,
-                    activation='relu'),
-                tf.keras.layers.Conv2DTranspose(
-                    filters=16,
                     kernel_size=4,
                     strides=1,
                     activation='relu'),
@@ -164,15 +166,18 @@ def compute_loss(vae_generator, discriminator, x, beta):
     mean, logvar = vae_generator.encode(x)
     z = vae_generator.reparameterize(mean, logvar)
     y = vae_generator.decoder(z)
+    z2 = tf.random.normal(shape=z.shape)
+    y2 = vae_generator.decoder(z2)
 
     #print(y.shape)
     #print(x.shape)
 
     real_output = discriminator(x, training=True)
     fake_output = discriminator(y, training=True)
+    fake_output2 = discriminator(y2, training=True)
 
     gen_loss = generator_loss(fake_output)
-    disc_loss = discriminator_loss(real_output, fake_output)
+    disc_loss = discriminator_loss(real_output, fake_output, fake_output2)
 
 
 
@@ -196,17 +201,19 @@ def compute_loss(vae_generator, discriminator, x, beta):
 
 
     en_loss = rec_loss+kl_loss
-    de_loss = 0.4*rec_loss+gen_loss
+    de_loss = rec_loss+gen_loss
 
     return en_loss, de_loss, disc_loss
 
 
-def discriminator_loss(real_output, fake_output):
+def discriminator_loss(real_output, fake_output, fake_output2):
 
     real_loss = cross_entropy(tf.ones_like(real_output), real_output)
     fake_loss = cross_entropy(tf.zeros_like(fake_output), fake_output)
-    total_loss = real_loss + fake_loss
-    return total_loss
+    fake_loss2 = cross_entropy(tf.zeros_like(fake_output2), fake_output2)
+
+    total_disc_loss = real_loss + 0.5*(fake_loss + fake_loss2)
+    return total_disc_loss
 
 
 def generator_loss(fake_output):
@@ -219,10 +226,13 @@ if __name__=="__main__":
     disc_layers = [
         InputLayer(input_shape=input_shape),
         Conv2D(32, 3, strides=1, padding='same'),
+        Dropout(0.5),
         LeakyReLU(),
         Conv2D(64, 4, strides=2, padding='same'),
-        LeakyReLU(),
-        Conv2D(64, 4, strides=2, padding='same'),
+        Dropout(0.5),
+
+        #LeakyReLU(),
+        #Conv2D(64, 4, strides=2, padding='same'),
         LeakyReLU(),
         Flatten(),
         Dense(1)
@@ -231,12 +241,12 @@ if __name__=="__main__":
     discriminator = tf.keras.Sequential(disc_layers, name="discriminator")
     discriminator.summary()
 
-    generator = VAE(input_shape=input_shape, latent_dim=256)
+    generator = VAE(input_shape=input_shape, latent_dim=64)
     generator.summary()
 
-    encoder_optimizer = tf.keras.optimizers.Adam(5e-4)
-    decoder_optimizer = tf.keras.optimizers.Adam(5e-4)
-    discriminator_optimizer = tf.keras.optimizers.Adam(5e-4)
+    encoder_optimizer = tf.keras.optimizers.Adam(1e-4)
+    decoder_optimizer = tf.keras.optimizers.Adam(1e-4)
+    discriminator_optimizer = tf.keras.optimizers.Adam(1e-4)
     # for test_images, labels in test_ds:
     #     #generator.test(test_images)
     #     break
@@ -246,10 +256,10 @@ if __name__=="__main__":
     #print(dir(train_ds))
     for e in range(100):
         st = time()
-        for i, (images, labels) in enumerate(train_ds):
-            print(i)
+        for i, (images, labels) in enumerate(tqdm(train_ds)):
+            #print(i)
             if not (i+1)%234:
-                print('hello')
+                #print('hello')
                 for test_images, labels in test_ds:
                     generator.test(test_images)
                     break
