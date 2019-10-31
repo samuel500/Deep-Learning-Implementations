@@ -151,18 +151,34 @@ class VAE(Model):
                     batch_x[j].reshape([imd, imd, 1])
                 canvas_orig[i * imd :(i + 1) * imd, j * imd + n*imd+1:(j + 1) * imd + n*imd+1] = \
                     g[j].reshape([imd, imd, 1])
+        
         canvas_orig[:, n*imd:n*imd+1] = 1
         print(canvas_orig.shape)
 
-        print("Original Images")
         plt.figure(figsize=(n*2+1, n))
         plt.imshow(canvas_orig[:,:,0], origin="upper", cmap='gray')
         plt.draw()
         plt.show()
+        
+        # canvas_orig = np.empty((imd*n , imd * n, 1))
+        # for i in range(n):
+        #     g = preds[i*n:i*n+n]
+
+        #     for j in range(n):
+        #         canvas_orig[i * imd:(i + 1) * imd, j * imd:(j + 1) * imd] = \
+        #             g[j].reshape([imd, imd, 1])
+        # # print(min(canvas_orig))
+        # # print(max(canvas_orig))
+        # plt.figure(figsize=(n, n))
+        # plt.imshow(canvas_orig[:,:,0], origin="upper", cmap='gray') #, vmin=min(canvas_orig), vmax=max(canvas_orig))
+        # plt.draw()
+        # plt.show()
+        
+
 
 
 #@tf.function
-def compute_loss(vae_generator, discriminator, x, beta):
+def compute_loss(vae_generator, discriminator, x, beta, gamma, gen_dec_weight):
     mean, logvar = vae_generator.encode(x)
     z = vae_generator.reparameterize(mean, logvar)
     y = vae_generator.decoder(z)
@@ -172,38 +188,48 @@ def compute_loss(vae_generator, discriminator, x, beta):
     #print(y.shape)
     #print(x.shape)
 
-    real_output = discriminator(x, training=True)
-    fake_output = discriminator(y, training=True)
-    fake_output2 = discriminator(y2, training=True)
+    
 
-    gen_loss = generator_loss(fake_output)
+    real_output = discriminator(x, training=True)
+    fake_output = discriminator(tf.sigmoid(y), training=True)
+    fake_output2 = discriminator(tf.sigmoid(y2), training=True)
+
+    gen_loss = generator_loss(fake_output, fake_output2)
     disc_loss = discriminator_loss(real_output, fake_output, fake_output2)
 
 
 
     rec_loss = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(logits=y, labels=x), axis=[1,2,3])
+    # print(tf.math.reduce_max(rec_loss))
     rec_loss = tf.reduce_mean(rec_loss)
+    # y = tf.sigmoid(y)
+    # #y2 = tf.sigmoid(y2)
+    # rec_loss = tf.reduce_sum(tf.math.square(x - y), axis=[1,2,3])
+    # rec_loss = tf.reduce_mean(rec_loss)
+
 
 
 
     kl_loss = -0.5*tf.math.reduce_sum((1 + logvar - tf.square(mean) - tf.exp(logvar)), axis=1)
     #kl_loss *= 0
     # https://openreview.net/forum?id=Sy2fzU9gl
-    #kl_loss *= beta
+  
     kl_loss = tf.reduce_mean(kl_loss)
+    kl_loss *= beta
 
-    print('kl', kl_loss)
-    print('recl', rec_loss)
-    print('gen_l', gen_loss)
-    print('discl', disc_loss)
+    # print('kl', kl_loss)
+    # print('recl', rec_loss)
+    # print('gen_l', gen_loss)
+    # print('discl', disc_loss)
 
-    disc_loss *= 0.5
+    #disc_loss *= 0.5
 
 
     en_loss = rec_loss+kl_loss
-    de_loss = rec_loss+gen_loss
+    de_loss = gamma*rec_loss+gen_loss*gen_dec_weight
 
-    return en_loss, de_loss, disc_loss
+    return en_loss, de_loss, disc_loss, {'kl': kl_loss.numpy(), 'recl': rec_loss.numpy(), 
+                                         'gen_l': gen_loss.numpy(), 'discl': disc_loss.numpy()}
 
 
 def discriminator_loss(real_output, fake_output, fake_output2):
@@ -212,28 +238,32 @@ def discriminator_loss(real_output, fake_output, fake_output2):
     fake_loss = cross_entropy(tf.zeros_like(fake_output), fake_output)
     fake_loss2 = cross_entropy(tf.zeros_like(fake_output2), fake_output2)
 
-    total_disc_loss = real_loss + 0.5*(fake_loss + fake_loss2)
+    total_disc_loss = real_loss + (fake_loss + fake_loss2)*0.5
     return total_disc_loss
 
 
-def generator_loss(fake_output):
-    return cross_entropy(tf.ones_like(fake_output), fake_output)
+
+def generator_loss(fake_output, fake_output2):
+    loss1 = cross_entropy(tf.ones_like(fake_output), fake_output)
+    loss2 = cross_entropy(tf.ones_like(fake_output2), fake_output2)
+    return loss1 + loss2
 
 
+if __name__=='__main__':
 
-if __name__=="__main__":
     input_shape = (28, 28, 1)
     disc_layers = [
         InputLayer(input_shape=input_shape),
-        Conv2D(32, 3, strides=1, padding='same'),
+        Conv2D(16, 4, strides=2, padding='same'),
         Dropout(0.5),
         LeakyReLU(),
-        Conv2D(64, 4, strides=2, padding='same'),
+        Conv2D(32, 4, strides=2, padding='same'),
         Dropout(0.5),
-
-        #LeakyReLU(),
+        LeakyReLU(),
+        # Conv2D(32, 4, strides=2, padding='same'),
+        # Dropout(0.5),
+        # LeakyReLU(),
         #Conv2D(64, 4, strides=2, padding='same'),
-        LeakyReLU(),
         Flatten(),
         Dense(1)
     ]
@@ -251,30 +281,44 @@ if __name__=="__main__":
     #     #generator.test(test_images)
     #     break
 
-    
+
     beta = tf.Variable(1.)
+    gamma = tf.Variable(1.)
+    gen_dec = tf.Variable(0.)
+    #gamma = tf.Variable(0.1)
     #print(dir(train_ds))
     for e in range(100):
+        print(e)
         st = time()
+
+
         for i, (images, labels) in enumerate(tqdm(train_ds)):
             #print(i)
-            if not (i+1)%234:
-                #print('hello')
-                for test_images, labels in test_ds:
-                    generator.test(test_images)
-                    break
+            # if not (i+1)%234:
+            #     #print('hello')
+            #     for test_images, labels in test_ds:
+            #         generator.test(test_images)
+            #         break
             images = tf.dtypes.cast(images, tf.float32)
 
             with tf.GradientTape() as tape1, tf.GradientTape() as tape2, tf.GradientTape() as tape3: 
-                en_loss, de_loss, disc_loss = compute_loss(generator, discriminator, images, beta)
+                en_loss, de_loss, disc_loss, info = compute_loss(generator, discriminator, images, beta, gamma, gen_dec)
 
-            
+            if not (i+1)%90:
+                print(i, info)
+
             gradients_of_encoder = tape1.gradient(en_loss, generator.encoder.trainable_variables)
             gradients_of_decoder = tape2.gradient(de_loss, generator.decoder.trainable_variables)
-            gradients_of_discriminator = tape3.gradient(disc_loss, discriminator.trainable_variables)
+
 
             encoder_optimizer.apply_gradients(zip(gradients_of_encoder, generator.encoder.trainable_variables))
             decoder_optimizer.apply_gradients(zip(gradients_of_decoder, generator.decoder.trainable_variables))
+            
+            
+
+            #if e > 2:
+            #    gen_dec = tf.Variable(5.)
+            gradients_of_discriminator = tape3.gradient(disc_loss, discriminator.trainable_variables)
             discriminator_optimizer.apply_gradients(zip(gradients_of_discriminator, discriminator.trainable_variables))
         print(time()-st)
 
