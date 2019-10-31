@@ -2,7 +2,7 @@
 
 Implementation of https://arxiv.org/pdf/1512.09300.pdf
 
-[alt text](https://github.com/samuel500/Deep-Learning-Implementations/blob/master/VAE-GAN/VAEGAN_20_epochs.png)
+[alt text](https://github.com/samuel500/Deep-Learning-Implementations/raw/master/VAE-GAN/VAEGAN_20_epochs.png)
 
 
 # Notes
